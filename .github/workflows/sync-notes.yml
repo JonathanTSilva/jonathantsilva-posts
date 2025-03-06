@@ -1,0 +1,51 @@
+name: Sync Notes to Public Repository
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Runs at midnight UTC daily
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  sync-notes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repository
+        uses: actions/checkout@v4
+        with:
+          repository: JonathanTSilva/OV-Notes
+          path: private-repo
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Checkout public repository
+        uses: actions/checkout@v4
+        with:
+          repository: JonathanTSilva/slip-box-notes
+          path: public-repo
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Sync notes
+        run: |
+          # Create destination directory if it doesn't exist
+          mkdir -p public-repo/public/notes
+
+          # Copy all markdown files from private to public repo
+          cp -r private-repo/04-Permanent/* public-repo/public/notes/
+
+      - name: Commit and push changes
+        run: |
+          cd public-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Set the remote URL with token authentication
+          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/JonathanTSilva/slip-box-notes.git
+
+          # Check if there are changes to commit
+          if git status --porcelain | grep .; then
+            git add public/notes
+            git commit -m "Auto-sync notes from private repository"
+            git push
+          else
+            echo "No changes to commit"
+          fi
